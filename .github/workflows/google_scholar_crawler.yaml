@@ -1,0 +1,33 @@
+name: Get Citation Data
+
+on: 
+ page_build: 
+ workflow_dispatch:
+ schedule:
+  - cron:  '0 8 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run
+      # Google Scholar sometimes blocks CI IPs; do not fail the whole job (and spam emails) when that happens.
+      continue-on-error: true
+      run: |
+        cd ./google_scholar_crawler
+        pip3 install -r requirements.txt
+        python3 main.py
+        cd ./results
+        git init
+        git config --local user.name "${GITHUB_ACTOR}"
+        git config --local user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+        export remote_repo="https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
+        git add *.json
+        git commit -m "Updated Citation Data"
+        git push "${remote_repo}" HEAD:google-scholar-stats --force
+      env: 
+        # Scholar ID is public; a repository secret with the same name overrides it if set.
+        GOOGLE_SCHOLAR_ID: ${{ secrets.GOOGLE_SCHOLAR_ID || 'YAvLb6UAAAAJ' }}
